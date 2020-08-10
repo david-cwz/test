@@ -1,0 +1,250 @@
+procedure chenwz_add_ivpn(--v_num in  number,
+                            iv_error_code out number,
+                                    iv_error_info out varchar2) is
+  cursor sa is
+--------------------------------------------
+  /*ivpn混合组网集团迁转添加*/
+  --------------------------------------------
+
+    select t.*,d.user_id,d.eparchy_code
+      from JC_HL_LITJ31.chenwz_product_order t, uop_crm4.tf_f_user d
+     where t.serial_number = d.serial_number
+       and d.remove_tag in ( '0', 'X')
+       and d.remark='迁转导入'
+       --and t.discnt_code2 is not null
+       and t.user_id_a is not null
+       and t.remark is null
+       --and mod(t.serial_number,5)=v_num
+       ;
+
+    iv_prod_item_id number;
+    iv_dis1_item_id number;
+    iv_dis2_item_id number;
+    iv_uu_item_id number;
+    iv_syn_id  number;
+    cnt varchar(10);
+    cnt1 varchar(10);
+    cnt2 varchar(10);
+    cnt_1 varchar(10);
+    cnt_2 varchar(10);
+    cnt_3 varchar(10);
+
+BEGIN
+  cnt := 0;
+  for c_sa in sa loop
+
+select  uop_crm4.f_sys_getseqid(c_sa.eparchy_code,'seq_item_id') into iv_prod_item_id FROM DUAL;
+
+select  uop_crm4.f_sys_getseqid(c_sa.eparchy_code,'seq_item_id') into iv_dis1_item_id FROM DUAL;
+
+select  uop_crm4.f_sys_getseqid(c_sa.eparchy_code,'seq_item_id') into iv_dis2_item_id FROM DUAL;
+
+select  uop_crm4.f_sys_getseqid(c_sa.eparchy_code,'seq_item_id') into iv_uu_item_id FROM DUAL;
+
+select count(*)
+  into cnt1
+  from uop_crm4.tf_f_relation_uu
+ where  serial_number_b = c_sa.serial_number
+   --and serial_number_a=c_sa.serial_number_a
+   and relation_type_code='20'
+   and  role_code_b='0'
+   and end_date>sysdate;
+
+if cnt1=0 then
+
+select count(*) into cnt_3 from uop_crm4.tf_f_user_product where user_id = c_sa.user_id and product_id=c_sa.product_id;
+if cnt_3=0 then
+insert into uop_crm4.tf_f_user_product (PARTITION_ID, USER_ID, PRODUCT_MODE, PRODUCT_ID, BRAND_CODE, START_DATE, END_DATE, ITEM_ID, USER_ID_A)
+values(mod(c_sa.user_id,10000),c_sa.user_id,'20',c_sa.product_id,'ZZZZ',c_sa.start_date, c_sa.end_date,iv_prod_item_id,c_sa.user_id_a);
+end if;
+
+select count(*) into cnt_1 from uop_crm4.tf_f_user_discnt where user_id=c_sa.user_id and discnt_code=c_sa.discnt_code1;
+if cnt_1=0 then
+insert into uop_crm4.tf_f_user_discnt (PARTITION_ID, USER_ID, USER_ID_A, PRODUCT_ID, PACKAGE_ID, DISCNT_CODE, SPEC_TAG, RELATION_TYPE_CODE, START_DATE, END_DATE, ITEM_ID)
+values (mod(c_sa.user_id,10000), c_sa.user_id, c_sa.user_id_a, c_sa.product_id, c_sa.package_id, c_sa.discnt_code1, '2', '20', c_sa.start_date, c_sa.end_date, iv_dis1_item_id);
+end if;
+
+ if c_sa.discnt_code2 is not null then
+
+select count(*) into cnt_2 from uop_crm4.tf_f_user_discnt where user_id=c_sa.user_id and discnt_code=c_sa.discnt_code2;
+if cnt_2=0 then
+insert into uop_crm4.tf_f_user_discnt (PARTITION_ID, USER_ID, USER_ID_A, PRODUCT_ID, PACKAGE_ID, DISCNT_CODE, SPEC_TAG, RELATION_TYPE_CODE, START_DATE, END_DATE, ITEM_ID)
+values (mod(c_sa.user_id,10000), c_sa.user_id, c_sa.user_id_a, c_sa.product_id, c_sa.package_id, c_sa.discnt_code2, '2', '20', c_sa.start_date, c_sa.end_date, iv_dis2_item_id);
+end if;
+
+end if;
+
+insert into uop_crm4.tf_f_user_res (PARTITION_ID, USER_ID, RES_TYPE_CODE, RES_CODE, RES_INFO1, RES_INFO2, RES_INFO3, RES_INFO4, RES_INFO5, RES_INFO6, RES_INFO7, RES_INFO8, START_DATE, END_DATE)
+values (mod(c_sa.user_id,10000), c_sa.user_id, 'S', c_sa.short_no, null, null, null, null, null, null, null, c_sa.user_id_a, c_sa.start_date, c_sa.end_date);
+
+insert into uop_crm4.tf_f_relation_uu (PARTITION_ID, USER_ID_A, SERIAL_NUMBER_A, USER_ID_B, SERIAL_NUMBER_B, RELATION_TYPE_CODE, ROLE_CODE_A, ROLE_CODE_B, ORDERNO, SHORT_CODE, START_DATE, END_DATE, ITEM_ID, RELATION_ATTR)
+values (mod(c_sa.user_id,10000),  c_sa.user_id_a, c_sa.serial_number_a, c_sa.user_id, c_sa.serial_number, '20', '0', '0', '-1', c_sa.short_no, c_sa.start_date, c_sa.end_date, iv_uu_item_id, null);
+
+insert into uop_crm4.tf_f_relation_uu_item (PARTITION_ID, ITEM_ID, ATTR_CODE, ATTR_VALUE, START_DATE, END_DATE)
+values (mod(iv_uu_item_id,10000), iv_uu_item_id, 'DISPMOD', '2', c_sa.start_date, c_sa.end_date);
+
+insert into uop_crm4.tf_f_relation_uu_item (PARTITION_ID, ITEM_ID, ATTR_CODE, ATTR_VALUE, START_DATE, END_DATE)
+values (mod(iv_uu_item_id,10000), iv_uu_item_id, 'MEM_ROLE_CODE', '0', c_sa.start_date, c_sa.end_date);
+
+insert into uop_crm4.tf_f_relation_uu_item (PARTITION_ID, ITEM_ID, ATTR_CODE, ATTR_VALUE, START_DATE, END_DATE)
+values (mod(iv_uu_item_id,10000), iv_uu_item_id, 'MEM_SERIAL_NUMBER', c_sa.serial_number, c_sa.start_date, c_sa.end_date);
+
+insert into uop_crm4.tf_f_relation_uu_item (PARTITION_ID, ITEM_ID, ATTR_CODE, ATTR_VALUE, START_DATE, END_DATE)
+values (mod(iv_uu_item_id,10000), iv_uu_item_id, 'MEM_SHORT_CODE', c_sa.short_no, c_sa.start_date, c_sa.end_date);
+
+insert into uop_crm4.tf_f_relation_uu_item (PARTITION_ID, ITEM_ID, ATTR_CODE, ATTR_VALUE, START_DATE, END_DATE)
+values (mod(iv_uu_item_id,10000), iv_uu_item_id, 'MEM_VPN_PLAT', '0', c_sa.start_date, c_sa.end_date);
+
+insert into uop_crm4.tf_f_relation_short (PARTITION_ID, USER_ID_A, SERIAL_NUMBER_A, USER_ID_B, SERIAL_NUMBER_B, RELATION_TYPE_CODE, SHORT_CODE, START_DATE, END_DATE)
+values (mod(c_sa.user_id_a,10000),  c_sa.user_id_a, c_sa.serial_number_a, c_sa.user_id, c_sa.serial_number, '20', c_sa.short_no, c_sa.start_date, c_sa.end_date);
+
+ update JC_HL_LITJ31.chenwz_product_order set remark='添加ivpn混合组网成功'||TO_char(sysdate ,'yyyy/mm/dd-hh24:mi:ss')
+ where serial_number=c_sa.serial_number and remark is null;
+
+  select count(*)
+  into cnt2
+  from uop_crm4.tf_f_relation_uu
+ where  serial_number_b = c_sa.serial_number
+   and relation_type_code='20'
+   and  role_code_b='9'
+   and end_date>sysdate;
+
+   if cnt2>0 then
+
+update uop_crm4.tf_f_relation_uu set end_date=sysdate
+ where  serial_number_b = c_sa.serial_number
+   and relation_type_code='20'
+   and role_code_b='9'
+   and end_date>sysdate;
+
+update uop_crm4.tf_f_relation_short set end_date=sysdate
+ where  serial_number_b = c_sa.serial_number
+   and user_id_b<>c_sa.user_id
+   and relation_type_code='20'
+   and end_date>sysdate;
+
+
+SELECT uop_crm4.f_sys_getseqid(c_sa.eparchy_code, 'seq_sync_incre_id')
+      INTO iv_syn_id
+      FROM DUAL;
+    INSERT INTO uop_crm4.TI_B_SYNCHINFO
+      (SYNC_SEQUENCE,
+       TRADE_ID,
+       STATE,
+       SYNC_TIME,
+       RESULT_INFO,
+       UPDATE_TIME,
+       REMARK,
+       RSRV_STR1,
+       RSRV_STR2,
+       RSRV_STR3,
+       SYNC_TYPE,
+       TRADE_TYPE_CODE,
+       NET_TYPE_CODE,
+       CUST_ID)
+    VALUES
+      (iv_syn_id,
+       iv_syn_id,
+       0,
+       '',
+       '',
+       SYSDATE,
+       '',
+       '',
+       '',
+       '',
+       '0',
+       '00',
+       '50',
+       '0');
+
+     INSERT INTO uop_crm4.TI_B_RELATION_UU
+          (SYNC_SEQUENCE,
+           PARTITION_ID,
+           USER_ID_A,
+           SERIAL_NUMBER_A,
+           USER_ID_B,
+           SERIAL_NUMBER_B,
+           RELATION_TYPE_CODE,
+           ROLE_CODE_A,
+           ROLE_CODE_B,
+           ORDERNO,
+           SHORT_CODE,
+           START_DATE,
+           END_DATE,
+           UPDATE_TIME,
+           MODIFY_TAG,
+           item_id
+           )
+          SELECT iv_syn_id,
+                 partition_id,
+                 user_id_a,
+                 serial_number_a,
+                 user_id_b,
+                 serial_number_b,
+                 relation_type_code,
+                 role_code_a,
+                 role_code_b,
+                 orderno,
+                 short_code,
+                 start_date,
+                 end_date,
+                 SYSDATE,
+                 '8',
+                 item_id
+            FROM uop_crm4.tf_f_relation_uu
+           WHERE
+              serial_number_b = c_sa.serial_number
+         and  serial_number_a = c_sa.serial_number_a
+         and relation_type_code='20'
+         and role_code_b='9';
+
+/*update uop_crm4.tf_f_relation_uu set user_id_b=c_sa.user_id,partition_id=mod(c_sa.user_id,10000),role_code_b='0',short_code=c_sa.short_no
+ where  serial_number_b = c_sa.serial_number
+   and relation_type_code='20'
+   and role_code_b='9'
+   and end_date>sysdate;*/
+
+update JC_HL_LITJ31.chenwz_product_order set remark=remark||'修改已有的BSS的ivpn关系成功'||TO_char(sysdate ,'yyyy/mm/dd-hh24:mi:ss')
+ where serial_number=c_sa.serial_number and remark is null;
+
+end if;
+
+else
+
+update JC_HL_LITJ31.chenwz_product_order set remark='用户已经有vipn'||TO_char(sysdate ,'yyyy/mm/dd-hh24:mi:ss')
+where serial_number=c_sa.serial_number and remark is null;
+
+
+end if;
+
+   cnt := cnt + 1;
+--非实时同步
+   /* insert into ucr_cen_turns.TI_B_TRANS_CTOB
+   (user_id, sync_code, province_code, update_time, update_staff_id)
+ values
+   (c_sa.user_id, 'ACH', c_sa.province_code, SYSDATE, 'chenwz1213');*/
+
+  P_ctb_stc(',6,8,26,30',c_sa.user_id, iv_error_code, iv_error_info);
+  --P_ctb_stc(',30,',c_sa.user_id, iv_error_code, iv_error_info);
+  --zhengp_p_ctb_stc('ACH',c_sa.user_id, iv_error_code, iv_error_info);
+  --zhengp_p_ctb_tmp('ACH',c_sa.user_id, iv_error_code, iv_error_info);
+  commit;
+
+  end loop;
+
+  --update JC_HL_LITJ31.chenwz_product_order set remark='用户表无数据'||TO_char(sysdate ,'yyyy/mm/dd-hh24:mi:ss') where  remark is null;
+-----------搬表操作----------
+insert into chenwz_bh_product_order select * from chenwz_product_order where remark is not null;
+delete chenwz_product_order where  remark is not null;
+
+  iv_error_info := 'OK'|| CNT; ----如果成功修改 将输出 OK  3
+
+  iv_error_code := 3;
+EXCEPTION
+  WHEN OTHERS THEN
+    iv_error_code := 9;
+
+    iv_error_info := '失败' || SQLERRM;
+
+end chenwz_add_ivpn;
