@@ -6,6 +6,7 @@ import java.util.*;
 /**
  * @author chenwz38
  * @date 2019-10-31 09:46
+ * 转化为in格式
  */
 public class StringTrans {
     private  static final long serialVersionUID=1;

@@ -17,7 +17,10 @@ public class Person {
 
     public static void main(String args[]) {
         //Person p = new Person();
-        Object o = (Object) "dfsa";
-        Person p1 = (Person) o;
+//        Object o = (Object) "dfsa";
+//        Person p1 = (Person) o;
+
+        System.out.println("a\nb");
+        System.out.println("a\\nb");
     }
 }
