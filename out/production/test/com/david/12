@@ -1,999 +1,226 @@
-PROCEDURE          zhoupf_td_SUB_all_cp(v_id         IN VARCHAR2,
-                                                      v_resultcode OUT NUMBER,
-                                                      v_result     OUT VARCHAR2) IS
-  iv_cb_del_data  uop_crm2.ti_bss_cb_del_data%ROWTYPE;
-  iv_rec_user        uop_crm2.tf_f_user%ROWTYPE;
-  iv_res_user        uop_crm2.tf_f_user_res%ROWTYPE;
-  iv_user_id         	uop_crm2.tf_f_user.user_id%TYPE;
-  iv_acct_Id          uop_crm2.tf_bh_trade.acct_id%TYPE;
-  iv_cust_id          uop_crm2.tf_f_user.cust_id%TYPE;
-  iv_syn_id         uop_crm2.ti_b_synchinfo.sync_sequence%TYPE;
-  iv_rec_trade         uop_crm2.tf_bh_trade%ROWTYPE;
-  v_serial_number         uop_crm2.tf_b_trade.serial_number%TYPE;
-  v_net_type_code         VARCHAR2(4);
-  iv_count                number;
---天津特殊修改，不删除账户表
-
-BEGIN
-  v_resultcode := -1;
-  --账前数据同步接口表查询
-  BEGIN
-    select *
-      INTO iv_cb_del_data
-      from uop_crm2.ti_bss_cb_del_data
-     where serial_number = v_id
-     ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '查询剔单表异常' || SQLERRM;
-      RETURN;
-  END;
-  v_serial_number := iv_cb_del_data.SERIAL_NUMBER;
-  v_net_type_code := iv_cb_del_data.NET_TYPE_CODE;
-  BEGIN
-    SELECT *
-      INTO iv_rec_user
-      FROM uop_crm2.tf_f_user
-     WHERE SERIAL_NUMBER = v_serial_number
-       and net_type_code = v_net_type_code
-      -- and eparchy_code = '0898'
-       and remove_tag = 'X';
-  EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-      v_result := '剔单表对应的用户实例表无数据' || SQLERRM;
-      RETURN;
-    WHEN OTHERS THEN
-      v_result := '剔单表对应的用户实例表出错' || SQLERRM;
-      RETURN;
-  END;
-  iv_user_id     := iv_rec_user.user_id; /*取到用户id*/
-  iv_cust_id     := iv_rec_user.cust_id; /*取到用户id*/
-  BEGIN
-    SELECT *
-      INTO iv_rec_trade
-      FROM uop_crm2.tf_bh_trade
-     WHERE SERIAL_NUMBER = v_serial_number
-     and user_id = iv_user_id
-      and SUBSCRIBE_STATE = '9'
-      and NEXT_DEAL_TAG = '0'
-      and trade_type_code = '4444'
-      and net_type_code = v_net_type_code
-       ;
-  EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-      v_result := '查询剔单表对应的订单表无数据' || SQLERRM;
-      RETURN;
-    WHEN OTHERS THEN
-      v_result := '查询剔单表对应的订单表出错' || SQLERRM;
-      RETURN;
-  END;
-    iv_acct_Id    := iv_rec_trade.acct_id;
-  --首先删除备份表数据
-  BEGIN
-    DELETE FROM uop_crm2.TF_F_USER_CBSS_BAK WHERE partition_id = MOD(to_number(iv_user_id),10000) and user_id = iv_user_id and serial_number = v_serial_number;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '删除用户剔单备份表(TF_F_USER_CBSS_BAK)异常-' || SQLERRM;
-      RETURN;
-  END;
-
-  --插入备份表
-  BEGIN
-   INSERT INTO uop_crm2.TF_F_USER_CBSS_BAK
-  (partition_id,
-   user_id,
-   cust_id,
-   usecust_id,
-   brand_code,
-   product_id,
-   eparchy_code,
-   city_code,
-   user_passwd,
-   user_diff_code,
-   user_type_code,
-   serial_number,
-   net_type_code,
-   score_value,
-   credit_class,
-   basic_credit_value,
-   credit_value,
-   acct_tag,
-   prepay_tag,
-   in_date,
-   open_date,
-   open_mode,
-   open_depart_id,
-   open_staff_id,
-   in_depart_id,
-   in_staff_id,
-   remove_tag,
-   destroy_time,
-   remove_eparchy_code,
-   remove_city_code,
-   remove_depart_id,
-   remove_reason_code,
-   pre_destroy_time,
-   first_call_time,
-   last_stop_time,
-   user_state_codeset,
-   mpute_month_fee,
-   mpute_date,
-   update_time,
-   assure_cust_id,
-   assure_type_code,
-   assure_date,
-   develop_staff_id,
-   develop_date,
-   develop_eparchy_code,
-   develop_city_code,
-   develop_depart_id,
-   develop_no,
-   remark,
-   credit_rule_id,
-   contract_id,
-   changeuser_date,
-   in_net_mode,
-   product_type_code,
-   main_discnt_code,
-   product_spec,
-   province_code)
-  (select partition_id,
-          user_id,
-          cust_id,
-          usecust_id,
-          brand_code,
-          product_id,
-          eparchy_code,
-          city_code,
-          user_passwd,
-          user_diff_code,
-          user_type_code,
-          serial_number,
-          net_type_code,
-          score_value,
-          credit_class,
-          basic_credit_value,
-          credit_value,
-          acct_tag,
-          prepay_tag,
-          in_date,
-          open_date,
-          open_mode,
-          open_depart_id,
-          open_staff_id,
-          in_depart_id,
-          in_staff_id,
-          'X',
-          destroy_time,
-          remove_eparchy_code,
-          remove_city_code,
-          remove_depart_id,
-          remove_reason_code,
-          pre_destroy_time,
-          first_call_time,
-          last_stop_time,
-          user_state_codeset,
-          mpute_month_fee,
-          mpute_date,
-          sysdate,
-          assure_cust_id,
-          assure_type_code,
-          assure_date,
-          develop_staff_id,
-          develop_date,
-          develop_eparchy_code,
-          develop_city_code,
-          develop_depart_id,
-          develop_no,
-          '迁转剔单备份',
-          credit_rule_id,
-          contract_id,
-          changeuser_date,
-          in_net_mode,
-          product_type_code,
-          main_discnt_code,
-          product_spec,
-          province_code
-     from uop_crm2.tf_f_user
-    where user_id = iv_user_id
-    and serial_number = v_serial_number);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入台帐TF_F_USER_CBSS_BAK表（备份）异常-' || SQLERRM;
-      RETURN;
-  END;
-  --删除中间历史表
-  BEGIN
-   DELETE FROM uop_crm2.TI_BH_BSS_CB_COMP WHERE serial_number = v_serial_number and state = '0';
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TI_BH_BSS_CB_COMP表异常-' || SQLERRM;
-      RETURN;
-  END;
-  --ctob用户主表标志1
-   BEGIN
-            SELECT uop_crm2.f_sys_getseqid (iv_rec_user.eparchy_code,
-                                   'seq_sync_incre_id')
-              INTO iv_syn_id
-              FROM DUAL;
-         END;
-   ---------------同步user表------------------------
-  BEGIN
-    INSERT INTO uop_crm2.TI_B_USER
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       NET_TYPE_CODE,
-       SERIAL_NUMBER,
-       USER_PASSWD,
-       EPARCHY_CODE,
-       CITY_CODE,
-       CUST_ID,
-       USECUST_ID,
-       BRAND_CODE,
-       PRODUCT_ID,
-       USER_TYPE_CODE,
-       PREPAY_TAG,
-       USER_STATE_CODESET,
-       OPEN_MODE,
-       ACCT_TAG,
-       REMOVE_TAG,
-       IN_DATE,
-       OPEN_DATE,
-       PRE_DESTROY_TIME,
-       DESTROY_TIME,
-       FIRST_CALL_TIME,
-       LAST_STOP_TIME,
-       CREDIT_CLASS,
-       BASIC_CREDIT_VALUE,
-       CREDIT_VALUE,
-       CHANGEUSER_DATE,
-       SCORE_VALUE,
-       UPDATE_TIME,
-       MODIFY_TAG,
-       CREDIT_CONTROL_ID,
-       PRODUCT_TYPE_CODE,
-       User_Diff_Code,
-       open_depart_id,
-       PROVINCE_CODE)
-      SELECT iv_syn_id SYNC_SEQUENCE,
-             PARTITION_ID,
-             USER_ID,
-             NET_TYPE_CODE,
-             SERIAL_NUMBER,
-             USER_PASSWD,
-             EPARCHY_CODE,
-             CITY_CODE,
-             CUST_ID,
-             USECUST_ID,
-             BRAND_CODE,
-             PRODUCT_ID,
-             USER_TYPE_CODE,
-             PREPAY_TAG,
-             USER_STATE_CODESET,
-             OPEN_MODE,
-             ACCT_TAG,
-             REMOVE_TAG,
-             IN_DATE,
-             OPEN_DATE,
-             PRE_DESTROY_TIME,
-             DESTROY_TIME,
-             FIRST_CALL_TIME,
-             LAST_STOP_TIME,
-             CREDIT_CLASS,
-             BASIC_CREDIT_VALUE,
-             CREDIT_VALUE,
-             CHANGEUSER_DATE,
-             SCORE_VALUE,
-             SYSDATE,
-             '1',
-             CREDIT_RULE_ID,
-             PRODUCT_TYPE_CODE,
-             DECODE(USER_DIFF_CODE, '00', '0', '1'),
-             open_depart_id,
-             PROVINCE_CODE
-        FROM uop_crm2.tf_f_user
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER）异常-' || SQLERRM;
-      RETURN;
-  END;
-
-----------------------同步资费信息-----------
-   BEGIN
-    INSERT INTO uop_crm2.TI_B_USER_DISCNT
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       USER_ID_A,
-       PRODUCT_ID,
-       PACKAGE_ID,
-       DISCNT_CODE,
-       SPEC_TAG,
-       RELATION_TYPE_CODE,
-       START_DATE,
-       END_DATE,
-       ITEM_ID,
-       UPDATE_TIME,
-       MODIFY_TAG)
-      SELECT iv_syn_id SYNC_SEQUENCE,
-             PARTITION_ID,
-             USER_ID,
-             USER_ID_A,
-             PRODUCT_ID,
-             PACKAGE_ID,
-             DISCNT_CODE,
-             SPEC_TAG,
-             RELATION_TYPE_CODE,
-             START_DATE,
-             END_DATE,
-             ITEM_ID,
-             SYSDATE,
-             '1'
-        FROM uop_crm2.tf_f_user_discnt
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER_DISCNT）异常-' || SQLERRM;
-      RETURN;
-  END;
-  -----------------同步product-------------------
- BEGIN
-    INSERT INTO uop_crm2.TI_B_USER_PRODUCT
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       PRODUCT_MODE,
-       PRODUCT_ID,
-       BRAND_CODE,
-       START_DATE,
-       END_DATE,
-       UPDATE_TIME,
-        MODIFY_TAG,
-       ITEM_ID,
-       USER_ID_A  )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       PRODUCT_MODE,
-       PRODUCT_ID,
-       BRAND_CODE,
-       START_DATE,
-       END_DATE,
-       SYSDATE,
-       '1',
-       ITEM_ID,
-       USER_ID_A
-        FROM uop_crm2.tf_f_user_product
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER_PRODUCT）异常-' || SQLERRM;
-      RETURN;
-  END;
-
---------------同步svc------------------
- BEGIN
-    INSERT INTO uop_crm2.TI_B_USER_SVC
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       PRODUCT_ID,
-       PACKAGE_ID,
-       SERVICE_ID,
-       MAIN_TAG,
-       ITEM_ID,
-       START_DATE,
-       END_DATE,
-       UPDATE_TIME,
-       MODIFY_TAG )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       PRODUCT_ID,
-       PACKAGE_ID,
-       SERVICE_ID,
-       MAIN_TAG,
-       ITEM_ID,
-   START_DATE,
-  END_DATE,
-       SYSDATE,
-       '1'
-        FROM uop_crm2.tf_f_user_svc
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER_SVC）异常-' || SQLERRM;
-      RETURN;
-  END;
----------------同步user_infochange------------------
- BEGIN
-    INSERT INTO uop_crm2.TI_B_USER_INFOCHANGE
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       NET_TYPE_CODE,
-       PRODUCT_ID,
-       BRAND_CODE,
-       SERIAL_NUMBER,
-       IMSI,
-       IMSI2,
-       START_DATE,
-       END_DATE,
-       UPDATE_TIME,
-       MODIFY_TAG,
-       PREPAY_TAG )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       NET_TYPE_CODE,
-       PRODUCT_ID,
-       BRAND_CODE,
-       SERIAL_NUMBER,
-       IMSI,
-       IMSI2,
-       START_DATE,
-       END_DATE,
-       SYSDATE,
-       '1',
-       PREPAY_TAG
-        FROM uop_crm2.tf_f_user_infochange
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER_INFOCHANGE）异常-' || SQLERRM;
-      RETURN;
-  END;
-/*
------------同步account------------
- BEGIN
-    INSERT INTO uop_crm2.TI_B_ACCOUNT
-      (SYNC_SEQUENCE,
-       EPARCHY_CODE,
-       PARTITION_ID,
-       ACCT_ID,
-       CUST_ID,
-       PAY_NAME,
-       NET_TYPE_CODE,
-       CITY_CODE,
-       PAY_MODE_CODE,
-       SCORE_VALUE,
-       CREDIT_CLASS_ID,
-       BASIC_CREDIT_VALUE,
-       CREDIT_VALUE,
-       CREDIT_CONTROL_ID,
-       DEBUTY_USER_ID,
-       DEBUTY_CODE,
-       CONTRACT_NO,
-       REMOVE_TAG,
-       OPEN_DATE,
-       REMOVE_DATE,
-       UPDATE_TIME,
-       MODIFY_TAG,
-       OLD_ACCT_ID,
-       PROVINCE_CODE )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       EPARCHY_CODE,
-       PARTITION_ID,
-       ACCT_ID,
-       CUST_ID,
-       PAY_NAME,
-       NET_TYPE_CODE,
-       CITY_CODE,
-       PAY_MODE_CODE,
-       SCORE_VALUE,
-       CREDIT_CLASS_ID,
-       BASIC_CREDIT_VALUE,
-       CREDIT_VALUE,
-       CREDIT_CONTROL_ID,
-       DEBUTY_USER_ID,
-       DEBUTY_CODE,
-       CONTRACT_NO,
-       REMOVE_TAG,
-       OPEN_DATE,
-       REMOVE_DATE,
-       SYSDATE,
-       '1',
-       OLD_ACCT_ID,
-       PROVINCE_CODE
-        FROM uop_crm2.tf_f_account
-       WHERE acct_id = iv_acct_id
-         AND partition_id = MOD(iv_acct_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_ACCOUNT）异常-' || SQLERRM;
-      RETURN;
-  END;
-*/
--------------------同步payrelation-----------------
-
- BEGIN
-    INSERT INTO uop_crm2.TI_B_PAYRELATION
-      (SYNC_SEQUENCE,
-      PAYRELATION_ID,
-       PARTITION_ID,
-       USER_ID,
-       ACCT_ID,
-       PAYITEM_CODE,
-       ACCT_PRIORITY,
-       USER_PRIORITY,
-       ADDUP_METHOD,
-       ADDUP_MONTHS,
-       LIMIT_TYPE,
-       LIMIT,
-       COMPLEMENT_TAG,
-       BIND_TYPE,
-       DEFAULT_TAG,
-       ACT_TAG,
-       START_ACYC_ID,
-       END_ACYC_ID,
-       UPDATE_TIME,
-       MODIFY_TAG )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       PAYRELATION_ID,
-       PARTITION_ID,
-       USER_ID,
-       ACCT_ID,
-       PAYITEM_CODE,
-       ACCT_PRIORITY,
-       USER_PRIORITY,
-       ADDUP_METHOD,
-       ADDUP_MONTHS,
-       LIMIT_TYPE,
-       LIMIT,
-       COMPLEMENT_TAG,
-       BIND_TYPE,
-       DEFAULT_TAG,
-       ACT_TAG,
-       START_ACYC_ID,
-       END_ACYC_ID,
-       SYSDATE,
-       '1'
-        FROM uop_crm2.tf_a_payrelation
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_PAYRELATION）异常-' || SQLERRM;
-      RETURN;
-  END;
-
--------------------USER_ITEM---------------
-
- BEGIN
-    INSERT INTO uop_crm2.TI_B_USER_ITEM
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       ATTR_CODE,
-       ATTR_VALUE,
-       START_DATE,
-       END_DATE,
-       UPDATE_TIME,
-       MODIFY_TAG )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       ATTR_CODE,
-       ATTR_VALUE,
-       START_DATE,
-       END_DATE,
-       SYSDATE,
-       '1'
-        FROM uop_crm2.TF_F_USER_ITEM
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER_ITEM）异常-' || SQLERRM;
-      RETURN;
-  END;
-
-  ------------------同步-svcstate--------------
- BEGIN
-    INSERT INTO uop_crm2.TI_B_USER_SVCSTATE
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       ITEM_ID,
-       USER_ID,
-       MAIN_TAG,
-       SERVICE_ID,
-       STATE_CODE,
-       START_DATE,
-       END_DATE,
-       UPDATE_TIME,
-       MODIFY_TAG )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       a.PARTITION_ID,
-       b.ITEM_ID,
-       a.USER_ID,
-       a.MAIN_TAG,
-       a.SERVICE_ID,
-       a.STATE_CODE,
-       a.START_DATE,
-       a.END_DATE,
-       SYSDATE,
-       '1'
-        FROM uop_crm2.tf_f_user_svcstate a,uop_crm2.tf_f_user_svc b
-       WHERE a.user_id = iv_user_id
-         AND a.user_id = b.user_id
-         AND a.service_id = b.service_id
-         AND a.partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER_SVCSTATE）异常-' || SQLERRM;
-      RETURN;
-  END;
-
-
-  BEGIN
-    INSERT INTO uop_crm2.TI_B_USER_SP
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       SERIAL_NUMBER,
-       PAY_USER_ID,
-       PAY_SERIAL_NUMBER,
-       PRODUCT_ID,
-       PACKAGE_ID,
-       PARTY_ID,
-       SP_ID,
-       SP_PRODUCT_ID,
-       FIRST_BUY_TIME,
-       START_DATE,
-       END_DATE,
-       UPDATE_TIME,
-       MODIFY_TAG,
-       ITEM_ID,
-       SP_SERVICE_ID )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID,
-       SERIAL_NUMBER,
-       PAY_USER_ID,
-       PAY_SERIAL_NUMBER,
-       PRODUCT_ID,
-       PACKAGE_ID,
-       PARTY_ID,
-       SP_ID,
-       SP_PRODUCT_ID,
-       FIRST_BUY_TIME,
-       START_DATE,
-       END_DATE,
-       SYSDATE,
-       '1',
-       ITEM_ID,
-       SP_SERVICE_ID
-        FROM uop_crm2.TF_F_USER_SP
-       WHERE user_id = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_USER_SP）异常-' || SQLERRM;
-      RETURN;
-  END;
-  --------------同步relation_uu------------------
-  BEGIN
-    INSERT INTO uop_crm2.TI_B_RELATION_UU
-      (SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID_A,
-       SERIAL_NUMBER_A,
-       USER_ID_B,
-       SERIAL_NUMBER_B,
-       RELATION_TYPE_CODE,
-       ROLE_CODE_A,
-       ROLE_CODE_B,
-       ORDERNO,
-       SHORT_CODE,
-       START_DATE,
-       END_DATE,
-       UPDATE_TIME,
-       MODIFY_TAG,
-       ITEM_ID )
-      SELECT iv_syn_id SYNC_SEQUENCE,
-       PARTITION_ID,
-       USER_ID_A,
-       SERIAL_NUMBER_A,
-       USER_ID_B,
-       SERIAL_NUMBER_B,
-       RELATION_TYPE_CODE,
-       ROLE_CODE_A,
-       ROLE_CODE_B,
-       ORDERNO,
-       SHORT_CODE,
-       START_DATE,
-       END_DATE,
-       SYSDATE,
-       '1',
-       ITEM_ID
-        FROM uop_crm2.TF_F_RELATION_UU
-       WHERE user_id_b = iv_user_id
-         AND partition_id = MOD(iv_user_id, 10000);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入ctob中间表（TI_B_RELATION_UU）异常-' || SQLERRM;
-      RETURN;
-  END;
-  ------------ZYY------------
-  --记录免处理生效时间同步账务
-  BEGIN
-   INSERT INTO uop_crm2.TI_B_SYNCHINFO (SYNC_SEQUENCE,
-                                           TRADE_ID,
-                                           STATE,
-                                           SYNC_TIME,
-                                           RESULT_INFO,
-                                           UPDATE_TIME,
-                                           REMARK,
-                                           RSRV_STR1,
-                                           RSRV_STR2,
-                                           RSRV_STR3,
-                                           SYNC_TYPE,
-                                           TRADE_TYPE_CODE,
-                                           NET_TYPE_CODE,
-                                           CUST_ID)
-                    VALUES (iv_syn_id,
-                            iv_syn_id,
-                            0,
-                            '',
-                            '',
-                            SYSDATE,
-                            '迁转剔单',
-                            '',
-                            '',
-                            '',
-                            '0',
-                            '00',
-                            v_net_type_code,
-                            iv_cust_id);
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '插入TI_B_SYNCHINFO异常-' || SQLERRM;
-      RETURN;
-  END;
-  --删除用户主表
-  BEGIN
-    delete from uop_crm2.TF_F_USER where partition_id = MOD(to_number(iv_user_id),10000) and cust_Id =iv_cust_id  and   user_id = iv_user_id  and serial_number = v_serial_number and remove_tag = 'X' ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '删除用户主表异常-' || SQLERRM;
-      RETURN;
-  END;
-/*  --删除账户主表
-  BEGIN
-    DELETE FROM uop_crm2.TF_F_ACCOUNT where  partition_id = MOD(to_number(iv_acct_Id),10000) and  ACCT_ID = iv_acct_Id ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '删除用户账户主表异常-' || SQLERRM;
-      RETURN;
-  END;*/
-  --删除用户付费关系表
-  BEGIN
-    DELETE FROM uop_crm2.TF_A_PAYRELATION where partition_id = MOD(to_number(iv_user_id),10000) and    USER_ID = iv_user_id AND  ACCT_ID = iv_acct_Id ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '删除用户付费关系表异常-' || SQLERRM;
-      RETURN;
-  END;
-  /* 删除uu关系*/
-   iv_count := 0;
-  BEGIN
-    select count(*)
-      INTO iv_count
-      from uop_crm2.tf_f_relation_uu
-     where serial_number_b  =  v_serial_number
-    and  user_id_b = iv_user_id
-    --and relation_type_code in ('2222','20')
-    ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '查询tf_f_relation_uu异常' || SQLERRM;
-      RETURN;
-  END;
-  IF iv_count > 0 then
-     BEGIN
-    DELETE FROM uop_crm2.tf_f_relation_uu where  partition_id = MOD(to_number(iv_user_id),10000) and    serial_number_b = v_serial_number  and user_Id_b = iv_user_id  ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '删除用户uu关系异常-' || SQLERRM;
-      RETURN;
-  END;
-  END IF;
-   --删除用户信息变化表TF_F_USER_INFOCHANGE
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_INFOCHANGE where  partition_id = MOD(to_number(iv_user_id),10000) and    user_Id = iv_user_id and SERIAL_NUMBER = v_serial_number;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_INFOCHANGE异常-' || SQLERRM;
-      RETURN;
-  END;
-     --删除用户产品类型表tf_f_user_product_type
-  BEGIN
-   DELETE FROM uop_crm2.tf_f_user_product_type where  partition_id = MOD(to_number(iv_user_id),10000) and    user_Id = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除tf_f_user_product_type异常-' || SQLERRM;
-      RETURN;
-  END;
-  --删除用户sp信息
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_SP where partition_id = MOD(to_number(iv_user_id),10000) and     USER_ID = iv_user_id and serial_number =v_serial_number ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_SP异常-' || SQLERRM;
-      RETURN;
-  END;
-  --删除用户服务信息
-    BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_SVC where partition_id = MOD(to_number(iv_user_id),10000) and    USER_ID = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_SVC异常-' || SQLERRM;
-      RETURN;
-  END;
-  --TF_F_USER_PRODUCT
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_PRODUCT where partition_id = MOD(to_number(iv_user_id),10000) and    USER_ID = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_PRODUCT异常-' || SQLERRM;
-      RETURN;
-  END;
-  --剔单删除TF_F_USER_DISCNT
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_DISCNT where partition_id = MOD(to_number(iv_user_id),10000) and     USER_ID = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_DISCNT异常-' || SQLERRM;
-      RETURN;
-  END;
- /*   --剔单删除TF_F_USER_DISCNT_ITEM
-  BEGIN
-   DELETE FROM TF_F_USER_DISCNT_ITEM where USER_ID = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_DISCNT_ITEM异常-' || SQLERRM;
-      RETURN;
-  END;
-      --剔单删除TF_F_USER_SVC_ITEM
-  BEGIN
-   DELETE FROM TF_F_USER_SVC_ITEM where USER_ID = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_SVC_ITEM异常-' || SQLERRM;
-      RETURN;
-  END;*/
-        --剔单删除TF_F_USER_SVCSTATE
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_SVCSTATE where partition_id = MOD(to_number(iv_user_id),10000) and    USER_ID = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_SVCSTATE异常-' || SQLERRM;
-      RETURN;
-  END;
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_ITEM where partition_id = MOD(to_number(iv_user_id),10000) and USER_ID = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_ITEM异常-' || SQLERRM;
-      RETURN;
-  END;
-
-   iv_count := 0;
-  BEGIN
-    select count(*)
-      INTO iv_count
-      from uop_crm2.TF_F_POSTINFO
-     where id_type  = '1'
-     and id  = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '查询TF_F_POSTINFO异常-' || SQLERRM;
-      RETURN;
-  END;
-  IF iv_count > 0 then
-     BEGIN
-    DELETE FROM uop_crm2.TF_F_POSTINFO where id_type = '1'and id = iv_user_id ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除用户TF_F_POSTINFO表异常-' || SQLERRM;
-      RETURN;
-  END;
-  END IF;
-  ----删tf_r_simcard_use前先查询，否则慢
-if v_net_type_code='50' then
-  BEGIN
-    SELECT *
-      INTO iv_res_user
-      FROM uop_crm2.TF_F_USER_RES
-     WHERE partition_id = MOD(to_number(iv_user_id),10000) and  user_id = iv_user_id and res_type_code = '1';
-  EXCEPTION
-    WHEN NO_DATA_FOUND THEN
-      v_result := '剔单表对应的用户res表无数据' || SQLERRM;
-      RETURN;
-    WHEN OTHERS THEN
-      v_result := '剔单表对应的用户res表出错' || SQLERRM;
-      RETURN;
-  END;
---剔单删除TF_R_SIMCARD_USE
-  BEGIN
-   DELETE FROM uop_crm2.TF_R_SIMCARD_USE where imsi = iv_res_user.res_info1 and sim_card_no = iv_res_user.res_code and  SERIAL_NUMBER = v_serial_number and remark ='迁转导入';
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_R_SIMCARD_USE异常-' || SQLERRM;
-      RETURN;
-  END;
-end if;
---剔单删除TF_F_USER_RES
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_RES where  partition_id = MOD(to_number(iv_user_id),10000) and  user_id = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_RES异常-' || SQLERRM;
-      RETURN;
-  END;
---剔单删除TF_F_USER_LIST_CRM
-  BEGIN
-   DELETE FROM uop_crm2.TF_F_USER_LIST_CRM where BIND_USER_ID = iv_user_id ;--iv_rec_user.develop_eparchy_code;(赵阳阳取消)
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_F_USER_LIST_CRM异常-' || SQLERRM;
-      RETURN;
-  END;
---剔单删除TI_B_USERPWD_4G
-  BEGIN
-   DELETE FROM ucr_crm2.TI_B_USERPWD_4G where partition_id = MOD(to_number(iv_user_id),10000) and user_id = iv_user_id;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TI_B_USERPWD_4G异常-' || SQLERRM;
-      RETURN;
-  END;
- --剔单删除tf_bh_trade
-  BEGIN
-    --融合中一个号码两条订单，不能限制user_id，改为cust_id
-   DELETE FROM uop_crm2.TF_BH_TRADE where CUST_ID = iv_cust_id AND SERIAL_NUMBER = v_id AND TRADE_TYPE_CODE = '4444' and cancel_tag = '0';
-
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除TF_BH_TRADE异常-' || SQLERRM;
-      RETURN;
-  END;
-  BEGIN--删除ms表
-   DELETE FROM uop_crm2.ti_b_ms where USER_ID = iv_user_id AND SERIAL_NUMBER = v_id ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除ms异常-' || SQLERRM;
-      RETURN;
-  END;
-    BEGIN--删除qzdr表
-   DELETE FROM ucr_crm2_qz.qzdr where USER_ID = iv_user_id AND SERIAL_NUMBER = v_id ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '剔单删除qzdr异常-' || SQLERRM;
-      RETURN;
-  END;
-    BEGIN--失效tf_f_relation_short表
-   update uop_crm2.tf_f_relation_short set end_date=sysdate
-    where USER_ID_B = iv_user_id
-      AND SERIAL_NUMBER_B = v_id
-      and relation_type_code in ('20')
-       ;
-  EXCEPTION
-    WHEN OTHERS THEN
-      v_result := '失效tf_f_relation_short异常-' || SQLERRM;
-      RETURN;
-  END;
-  v_result     := 'ok';
-  v_resultcode := 1;/*成功等于1*/
-EXCEPTION
-  WHEN OTHERS THEN
-    v_result     := '失败:' || v_result || sqlerrm;
-    v_resultcode := -1;
-    rollback;
-END zhoupf_td_SUB_all_cp;
+{
+    "UNI_BSS_BODY":{
+        "MIX_CARD_DATA_APP_REQ":{
+            "MSG":{
+                "CHANNEL_ID":"89b2nky",
+                "OPE_SYS_TYPE":"2",
+                "BROAD_BAND_TEMPLATE":[
+                    {
+                        "ADDRESS_CODE":"000102140000000024141882",
+                        "IS_SERIAL":"2",
+                        "CREATE_OR_EXTENDS_ACCT":"0",
+                        "CBSS_ACCESS_MODE":"A13",
+                        "EXCH_CODE":"433868",
+                        "INSTALL_MODE":"0",
+                        "exchInfo":[
+                            {
+                                "VALUE":"乌鲁木齐米东区春和隆盛园FTTH三网局",
+                                "KEY":"433868"
+                            }
+                        ],
+                        "ADDRESS_NAME":"新疆乌鲁木齐米东区东瑞北路南七巷11号春和隆盛园5号楼3单元25层2506室",
+                        "DEBUTY_AREA_CODE":"0991",
+                        "ACCOUNT_PAY_TYPE":"10",
+                        "DEBUTY_SERIAL_NUMBER":"16699569671",
+                        "BROAD_BAND_TYPE":"1",
+                        "GROUP_ID":"",
+                        "ACCESS_MODE":"B61",
+                        "ACCT_SERIAL_NUMBER":"099106021098",
+                        "BOOKING_DATE_TYPE":"0",
+                        "ACCOUNT_CODE":"099106021098",
+                        "BROAD_BAND_CUST_INFO":{
+                            "CONTACT_ADDRESS":"甘肃省肃南裕固族自治县皇城镇东庄村０１号",
+                            "CUSTOMER_NAME":"罗金成",
+                            "CERT_ADRESS":"甘肃省肃南裕固族自治县皇城镇东庄村０１号",
+                            "CERT_TYPE":"02",
+                            "CONTACT_PERSON":"罗金成",
+                            "CHECK_TYPE":"02",
+                            "CERT_EXPIRE_DATE":"20291007",
+                            "CONTACT_PHONE":"13997498531",
+                            "CUST_TYPE":"1",
+                            "CERT_NUM":"622222197110010911",
+                            "BAND_CUST_ID":"8922061670899193"
+                        },
+                        "BROAD_BAND_RECOM_INFO":{
+                            "RECOM_PERSON_NAME":"乌鲁木齐水磨沟区飞桦盛世新联合作厅",
+                            "RECOM_DEPART_ID":"89b2nky",
+                            "RECOM_PERSON_ID":"8913512764"
+                        },
+                        "OFFER_INFO":[
+                            {
+                                "OFFER_TYPE_CODE":"213",
+                                "OFFER_ID":"892206138530"
+                            },
+                            {
+                                "OFFER_ATTR":[
+                                    {
+                                        "ATTR_VALUE":"099106021098@iptv",
+                                        "ATTR_CODE":"iptvnbr",
+                                        "ARRT_TYPE":"20"
+                                    },
+                                    {
+                                        "ATTR_VALUE":"@IPTV终端",
+                                        "ATTR_CODE":"terminalsrcmode",
+                                        "ARRT_TYPE":"20"
+                                    },
+                                    {
+                                        "ATTR_VALUE":"免费使用",
+                                        "ATTR_CODE":"terminaltype1",
+                                        "ARRT_TYPE":"20"
+                                    },
+                                    {
+                                        "ATTR_VALUE":"123456",
+                                        "ATTR_CODE":"iptvpassword",
+                                        "ARRT_TYPE":"20"
+                                    }
+                                ],
+                                "OFFER_TYPE_CODE":"41",
+                                "OFFER_ID":"891207265443"
+                            }
+                        ],
+                        "GROUP_FLAG":"",
+                        "SPEED_LEVEL":"500",
+                        "INSTALL_ADDRESS":"新疆乌鲁木齐米东区东瑞北路南七巷11号春和隆盛园5号楼3单元25层2506室",
+                        "BROAD_BAND_PRODUCT":[
+                            {
+                                "IPTV_PRODUCT_ID":"90396813",
+                                "BORAD_DISCNT_INFO":[
+                                    {
+                                        "BORAD_DISCNT_CYCLE":"12"
+                                    }
+                                ],
+                                "AREA_EXCH_ID":"90001",
+                                "MODULE_EXCH_ID":"",
+                                "CITY_AREA":"0991",
+                                "PRODUCT_MODE":"1",
+                                "NO_DEFAULT_TAG":"",
+                                "PACKAGE_ELEMENT":[
+                                    {
+                                        "ELEMENT_TYPE":"D"
+                                    }
+                                ],
+                                "FIRST_MON_BILL_MODE":"01",
+                                "SERVICE_AREA":"892563",
+                                "POINT_EXCH_ID":"433868",
+                                "IPTV_INFO":[
+                                    {
+                                        "IPTV_SERVICE_ATTR":[
+                                            {
+                                                "CODE":"terminaltype1",
+                                                "VALUE":"免费使用"
+                                            },
+                                            {
+                                                "CODE":"terminalsrcmode",
+                                                "VALUE":"IPTV终端"
+                                            },
+                                            {
+                                                "CODE":"iptvpassword",
+                                                "VALUE":"123456"
+                                            }
+                                        ],
+                                        "IPTV_SERVICE":"4089036"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                "DISTRICT":"892563",
+                "PHONE_TEMPLATE":[
+                    {
+                        "MAIN_NUMBER_TAG":"0",
+                        "SIM_CARD_NO":[
+                            {
+                                "CARD_DATA":"MIIBmgYJKoZIhvcNAQcDoIIBizCCAYcCAQAxggETMIIBDwIBADB4MHAxCzAJBgNVBAYTAkNOMQ4wDAYDVQQIDAVqaWxpbjESMBAGA1UEBwwJY2hhbmdjaHVuMQwwCgYDVQQKDANDTkMxDjAMBgNVBAsMBUNOQ0NBMR8wHQYDVQQDDBZDSElOQSBORVRDT00gQ0xBU1MzIENBAgQAhH9bMA0GCSqGSIb3DQEBAQUABIGAELYmUf8pfp2JwHMZjPyJHFp%2FtN1qm3KcdBaNp5xgzwgauu3kW7cPIV%2BG0A6u1U1HGUZKPrAMrsHaBFVQ0d1Ar5s9AhOmEYSxl8fL9seAPqOtxfitqCIpImrsd9Y2s396T9CSXWi6aLrwmA7KmDIbdWa%2BrEPCYS9a8UjY942P%2BqwwawYJKoZIhvcNAQcBMBQGCCqGSIb3DQMHBAjwG73MgmMp6IBIOdHJRRYS%2BUqIrklds2Eubz1%2BveR3lGFw48fMbQnwyU8X8xVK%2F8Qun4Yvkw4fKx2XheFFuXLRK7TAyRmZ5MyVOfnRLawzD1U3",
+                                "CAPACITY_TYPE_CODE":"1000101",
+                                "RES_KIND_CODE":"59",
+                                "SIM_ID":"8986012180206390303",
+                                "IMSI":"460099569113998",
+                                "CARD_TYPE":"59",
+                                "CARD_DATA_PROC_ID":"20220616105227004886",
+                                "CARD_FEE":"0"
+                            }
+                        ],
+                        "PHONE_CUST_INFO":{
+                            "CONTACT_ADDRESS":"甘肃省肃南裕固族自治县皇城镇东庄村０１号",
+                            "CUST_ID":"8922061670899193",
+                            "CUSTOMER_NAME":"罗金成",
+                            "CERT_ADRESS":"甘肃省肃南裕固族自治县皇城镇东庄村０１号",
+                            "CERT_TYPE":"02",
+                            "CONTACT_PERSON":"罗金成",
+                            "CHECK_TYPE":"02",
+                            "CERT_EXPIRE_DATE":"20291007",
+                            "CONTACT_PHONE":"13997498531",
+                            "CUST_TYPE":"1",
+                            "CERT_NUM":"622222197110010911"
+                        },
+                        "SER_TYPE":"1",
+                        "INSTALL_MODE":"0",
+                        "PHONE_SPEED_LEVEL":"3",
+                        "CARD_TYPE":"0",
+                        "PHONE_RECOM_INFO":{
+                            "RECOM_PERSON_NAME":"乌鲁木齐水磨沟区飞桦盛世新联合作厅",
+                            "RECOM_DEPART_ID":"89b2nky",
+                            "RECOM_PERSON_ID":"8913512764"
+                        },
+                        "GROUP_ID":"",
+                        "SERIAL_NUMBER":"16699569671",
+                        "NICE_NUMBER_INFO":{
+                            "ADVANCE_PAY":"0",
+                            "CLASS_ID":"9"
+                        },
+                        "OFFER_INFO":[
+                            {
+                                "OFFER_TYPE_CODE":"33",
+                                "FIRST_MON_BILL_MODE":"01",
+                                "OFFER_ID":"892206085193"
+                            }
+                        ],
+                        "GROUP_FLAG":""
+                    }
+                ],
+                "ORDER":{
+                    "IN_MODE_CODE":"5889",
+                    "TOUCH_ORDER_ID":"20220616524855990688"
+                },
+                "OPERATOR_ID":"vxj89ac3bw",
+                "CITY":"890",
+                "MIX_TEMPLATE":{
+                    "MIX_CUST_INFO":{
+                        "CUST_ID":"8922061670899193",
+                        "CUSTOMER_NAME":"罗金成",
+                        "CERT_ADRESS":"甘肃省肃南裕固族自治县皇城镇东庄村０１号",
+                        "CERT_TYPE":"02",
+                        "CHECK_TYPE":"02",
+                        "CERT_EXPIRE_DATE":"20291007",
+                        "CUST_TYPE":"1",
+                        "CERT_NUM":"622222197110010911"
+                    },
+                    "OFFER_INFO":[
+                        {
+                            "OFFER_TYPE_CODE":"209",
+                            "OFFER_ID":"892201034660"
+                        }
+                    ],
+                    "ACCT_INFO":[
+                        {
+                            "CREATE_OR_EXTENDS_ACCT":"0",
+                            "ACCOUNT_PAY_TYPE":"10",
+                            "DEBUTY_SN":"16699569671"
+                        }
+                    ]
+                },
+                "ORDER_REMARKS":"66新开。李时润单元门给你打开了",
+                "PROVINCE":"89",
+                "CHANNEL_TYPE":"2010100",
+                "ORDERS_ID":"20220616524855990644"
+            }
+        }
+    },
+    "UNI_BSS_HEAD":{
+        "APP_ID":"xjSQc78DpT",
+        "TIMESTAMP":"2022-06-16 10:58:37 924",
+        "TRANS_ID":"20220616105837923122453",
+        "TOKEN":"******"
+    }
+}
